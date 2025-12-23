@@ -1,6 +1,6 @@
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 import pytest
-from app import app
+from app import app, get_post_data
 
 
 @pytest.fixture
@@ -10,8 +10,7 @@ def client():
         yield client
 
 
-@patch("requests.get")
-def test_get_post_data(mock_get, client):
+def test_get_post_data(client):
     mock_response = Mock()
     mock_response.json.return_value = {
         "id": 1,
@@ -20,12 +19,15 @@ def test_get_post_data(mock_get, client):
         "userId": 1,
     }
     mock_response.raise_for_status.return_value = None
-    mock_get.return_value = mock_response
 
-    response = client.get("/posts/1")
+    def mock_http_client(url):
+        assert url == "https://jsonplaceholder.typicode.com/posts/1"
+        return mock_response
 
-    assert response.status_code == 200
+    with app.test_request_context():
+        result = get_post_data(1, get_data_abstraction=mock_http_client)
+        data = result.get_json()
 
-    data = response.get_json()
-    assert "title" in data
-    assert "body" in data
+        assert result.status_code == 200
+        assert "title" in data
+        assert "body" in data
